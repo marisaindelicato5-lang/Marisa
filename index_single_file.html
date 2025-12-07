@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Calendario Attività (Single File)</title>
+  <meta name="theme-color" content="#0f766e"/>
+  <style>
+/* === Stili base (IT) === */
+:root{--bg:#0b1324;--panel:#0f172a;--text:#e2e8f0;--muted:#94a3b8;--primary:#0f766e;--danger:#b91c1c;--grid:#1f2937}
+*{box-sizing:border-box} html,body{height:100%} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell}
+.app-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--panel);position:sticky;top:0;z-index:10;border-bottom:1px solid #0b0f1a}
+.brand{display:flex;align-items:center;gap:8px}
+.top-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.btn{background:#0b2233;color:#e5e7eb;border:1px solid #0a1f30;padding:8px 10px;border-radius:8px;cursor:pointer}
+.btn:hover{filter:brightness(1.1)} .btn.primary{background:var(--primary);color:#fff;border-color:#0b5c56} .btn.danger{background:var(--danger);color:#fff;border-color:#7f1d1d}
+.icon-btn{background:transparent;border:none;color:var(--text);font-size:20px;cursor:pointer}
+.layout{display:grid;grid-template-columns:2fr 1fr;gap:12px;padding:12px}
+.calendar{background:var(--panel);padding:10px;border-radius:12px} .details{background:var(--panel);padding:10px;border-radius:12px}
+.weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:8px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.day{border:1px solid var(--grid);border-radius:10px;padding:8px;min-height:90px;background:#0b1a2a;display:flex;flex-direction:column}
+.day .date{font-weight:600;color:#cbd5e1} .day .items{margin-top:6px;display:flex;flex-direction:column;gap:4px}
+.day .item{background:#142033;border:1px solid #0f2436;padding:4px 6px;border-radius:8px;color:#cbd5e1}
+.day.today{outline:2px solid var(--primary)} .day.selected{border-color:var(--primary)}
+.details-header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #0b0f1a;padding-bottom:6px;margin-bottom:6px}
+.activity-list{display:flex;flex-direction:column;gap:6px}
+.activity-card{border:1px solid #0f2436;background:#121b2b;border-radius:10px;padding:8px}
+.activity-card h4{margin:0 0 4px 0} .activity-card .meta{color:#94a3b8;font-size:12px} .activity-card .actions{display:flex;gap:6px;margin-top:6px}
+.dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+.field{display:flex;flex-direction:column;gap:4px;margin:6px 0}
+.columns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px} .row{display:flex;gap:8px}
+input,select,textarea{background:#0b2233;color:#e5e7eb;border:1px solid #0a1f30;border-radius:8px;padding:8px}
+label{color:#cbd5e1}
+.app-footer{padding:8px 12px;color:#94a3b8}
+:root.light{--bg:#f8fafc;--panel:#fff;--text:#0f172a;--muted:#334155;--primary:#0ea5e9;--danger:#b91c1c;--grid:#e2e8f0}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header class="app-header" role="banner">
+    <div class="brand">
+      <button id="btnMenu" class="icon-btn" aria-label="Apri impostazioni" title="Impostazioni">⚙️</button>
+      <h1>Calendario Attività</h1>
+    </div>
+    <nav class="top-controls" aria-label="Navigazione calendario">
+      <button id="prevMonth" class="btn" title="Mese precedente" aria-label="Mese precedente">←</button>
+      <div class="month-label" aria-live="polite">
+        <select id="monthSelect" aria-label="Seleziona mese"></select>
+        <select id="yearSelect" aria-label="Seleziona anno"></select>
+      </div>
+      <button id="nextMonth" class="btn" title="Mese successivo" aria-label="Mese successivo">→</button>
+      <button id="todayBtn" class="btn" title="Vai a oggi" aria-label="Vai a oggi">Oggi</button>
+      <button id="exportWeekBtn" class="btn primary" title="Esporta settimana (CSV)">Esporta settimana</button>
+      <button id="exportMonthBtn" class="btn" title="Esporta mese (CSV)">Esporta mese</button>
+      <button id="backupBtn" class="btn" title="Backup JSON">Backup</button>
+      <button id="restoreBtn" class="btn" title="Ripristina da JSON">Ripristina</button>
+    </nav>
+  </header>
+
+  <main class="layout" role="main">
+    <section class="calendar" aria-label="Calendario">
+      <div class="weekdays" role="row">
+        <div>Lun</div><div>Mar</div><div>Mer</div><div>Gio</div><div>Ven</div><div>Sab</div><div>Dom</div>
+      </div>
+      <div id="calendarGrid" class="grid" aria-live="polite"></div>
+    </section>
+
+    <aside class="details" aria-label="Dettagli giorno" id="detailsPanel">
+      <div class="details-header">
+        <h2 id="selectedDateLabel">Dettagli</h2>
+        <div class="details-actions">
+          <button id="newActivityBtn" class="btn primary">+ Aggiungi attività</button>
+          <button id="duplicateDayBtn" class="btn">Duplica giorno</button>
+        </div>
+      </div>
+      <div id="activityList" class="activity-list" aria-live="polite"></div>
+      <div class="totals">
+        <div><strong>Totale ore giorno:</strong> <span id="dayTotal">0:00</span></div>
+        <div><strong>Totale ore settimana:</strong> <span id="weekTotal">0:00</span></div>
+      </div>
+    </aside>
+  </main>
+
+  <dialog id="activityDialog" aria-labelledby="activityDialogTitle">
+    <form id="activityForm" method="dialog">
+      <h3 id="activityDialogTitle">Attività</h3>
+      <input type="hidden" id="activityId" />
+      <div class="field">
+        <label for="activityTitle">Titolo *</label>
+        <input id="activityTitle" type="text" required maxlength="120" placeholder="Es: Report settimanale" />
+      </div>
+      <div class="columns">
+        <div class="field">
+          <label for="activityCategory">Categoria</label>
+          <select id="activityCategory">
+            <option value="Generale">Generale</option>
+            <option value="Progetto">Progetto</option>
+            <option value="Formazione">Formazione</option>
+            <option value="Amministrazione">Amministrazione</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="activityTags">Tag (comma)</label>
+          <input id="activityTags" type="text" placeholder="clienteA, urgenza" />
+        </div>
+      </div>
+      <div class="columns">
+        <div class="field">
+          <label for="startTime">Inizio *</label>
+          <input id="startTime" type="time" required />
+        </div>
+        <div class="field">
+          <label for="endTime">Fine *</label>
+          <input id="endTime" type="time" required />
+        </div>
+        <div class="field">
+          <label for="breakMinutes">Pausa (min)</label>
+          <input id="breakMinutes" type="number" min="0" max="480" value="0" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="activityNotes">Note</label>
+        <textarea id="activityNotes" rows="3" maxlength="1000" placeholder="Dettagli rilevanti"></textarea>
+      </div>
+      <menu class="dialog-actions">
+        <button value="cancel" class="btn">Annulla</button>
+        <button id="saveActivityBtn" value="default" class="btn primary">Salva</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog" aria-labelledby="settingsDialogTitle">
+    <form id="settingsForm" method="dialog">
+      <h3 id="settingsDialogTitle">Impostazioni</h3>
+      <div class="field">
+        <label for="themeSelect">Tema</label>
+        <select id="themeSelect">
+          <option value="system">Sistema</option>
+          <option value="light">Chiaro</option>
+          <option value="dark">Scuro</option>
+        </select>
+      </div>
+      <fieldset class="premium">
+        <legend>Funzionalità Premium</legend>
+        <p class="help">Proteggi i tuoi dati con password (AES‑GCM) e sblocco all’avvio.</p>
+        <div id="premiumStatus" class="status"></div>
+        <div class="field">
+          <label for="premiumPassword">Password</label>
+          <input id="premiumPassword" type="password" placeholder="Imposta o inserisci password" />
+        </div>
+        <div class="row">
+          <button id="enablePremiumBtn" class="btn">Abilita protezione</button>
+          <button id="disablePremiumBtn" class="btn danger">Disabilita</button>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Altro</legend>
+        <button id="clearDataBtn" class="btn danger">Cancella tutti i dati</button>
+      </fieldset>
+      <menu class="dialog-actions">
+        <button value="cancel" class="btn">Chiudi</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <footer class="app-footer" role="contentinfo">
+    <small>v1.0.0 • Offline • LocalStorage • PWA-ready</small>
+  </footer>
+
+<script>
+// JS essenziale (ridotto) per single-file — carica stato, render, CRUD
+(function(){'use strict';
+const STORAGE_KEY='calendarAppData.v1'; const pad=n=>String(n).padStart(2,'0');
+const fmtDate=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const minutesToHHMM=min=>`${Math.floor(min/60)}:${pad(min%60)}`;
+const state={year:new Date().getFullYear(),month:new Date().getMonth(),selectedDate:new Date(),data:{version:1,days:{},settings:{theme:'system'}}};
+const grid=document.getElementById('calendarGrid'),monthSelect=document.getElementById('monthSelect'),yearSelect=document.getElementById('yearSelect');
+const selectedDateLabel=document.getElementById('selectedDateLabel'),activityList=document.getElementById('activityList');
+const dayTotalEl=document.getElementById('dayTotal'),weekTotalEl=document.getElementById('weekTotal');
+const newActivityBtn=document.getElementById('newActivityBtn');
+const activityDialog=document.getElementById('activityDialog');
+const activityForm=document.getElementById('activityForm');
+const activityId=document.getElementById('activityId'),activityTitle=document.getElementById('activityTitle');
+const activityCategory=document.getElementById('activityCategory'),activityTags=document.getElementById('activityTags');
+const startTime=document.getElementById('startTime'),endTime=document.getElementById('endTime'),breakMinutes=document.getElementById('breakMinutes');
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state.data));}
+function load(){const raw=localStorage.getItem(STORAGE_KEY); if(raw){try{state.data=JSON.parse(raw)}catch{}} renderAll();}
+function buildSelectors(){const months=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre']; monthSelect.innerHTML=months.map((m,i)=>`<option value="${i}">${m}</option>`).join(''); const y0=new Date().getFullYear(); const years=[]; for(let y=y0-3;y<=y0+3;y++){years.push(`<option value="${y}">${y}</option>`)} yearSelect.innerHTML=years.join(''); monthSelect.value=state.month; yearSelect.value=state.year;}
+function renderCalendar(){grid.innerHTML=''; const first=new Date(state.year,state.month,1); const startDay=(first.getDay()+6)%7; const daysInMonth=new Date(state.year,state.month+1,0).getDate(); const cells=startDay+daysInMonth; const weeks=Math.ceil(cells/7); let dayNum=1; for(let w=0;w<weeks;w++){for(let d=0;d<7;d++){const cell=document.createElement('div'); cell.className='day'; if(w===0&&d<startDay){cell.innerHTML='<div class="date"></div>'; cell.setAttribute('aria-disabled','true');} else if(dayNum<=daysInMonth){const date=new Date(state.year,state.month,dayNum); const iso=fmtDate(date); const isToday=iso===fmtDate(new Date()); if(isToday) cell.classList.add('today'); if(fmtDate(state.selectedDate)===iso) cell.classList.add('selected'); const items=state.data.days[iso]||[]; cell.innerHTML=`<div class="date">${dayNum}</div><div class="items">${items.slice(0,3).map(i=>`<div class=\"item\">${i.title} (${i.durationHHMM})</div>`).join('')}${items.length>3?'<div class="item">…</div>':''}</div>`; cell.tabIndex=0; cell.addEventListener('click',()=>selectDate(date)); cell.addEventListener('keydown',(ev)=>{if(ev.key==='Enter')selectDate(date)}); dayNum++;} grid.appendChild(cell);} }
+}
+function renderDetails(){const iso=fmtDate(state.selectedDate); selectedDateLabel.textContent=`Dettagli — ${new Intl.DateTimeFormat('it-IT',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}).format(state.selectedDate)}`; const items=(state.data.days[iso]||[]).sort((a,b)=>a.start.localeCompare(b.start)); activityList.innerHTML=items.map(item=>{const tags=(item.tags||[]).join(', '); return `<article class=\"activity-card\" data-id=\"${item.id}\"><h4>${item.title}</h4><div class=\"meta\">${item.category} • ${item.start}-${item.end} • ${item.durationHHMM}${tags?` • #${tags}`:''}</div><p>${item.notes?item.notes.replace(/</g,'&lt;'):' '}</p><div class=\"actions\"><button class=\"btn\" data-action=\"edit\">Modifica</button><button class=\"btn danger\" data-action=\"delete\">Elimina</button></div></article>`;}).join(''); activityList.querySelectorAll('.activity-card .actions button').forEach(btn=>{btn.addEventListener('click',(ev)=>{const id=ev.target.closest('.activity-card').dataset.id; const iso=fmtDate(state.selectedDate); if(ev.target.dataset.action==='edit'){const item=(state.data.days[iso]||[]).find(i=>i.id===id); openActivity(item);} else if(ev.target.dataset.action==='delete'){if(confirm('Eliminare questa attività?')){state.data.days[iso]=(state.data.days[iso]||[]).filter(i=>i.id!==id); save(); renderDetails(); renderCalendar();}}});}); const totalMin=items.reduce((acc,i)=>acc+i.durationMin,0); dayTotalEl.textContent=minutesToHHMM(totalMin); const monday=new Date(state.selectedDate); const dow=(monday.getDay()+6)%7; monday.setDate(monday.getDate()-dow); let wMin=0; for(let i=0;i<7;i++){const d=new Date(monday); d.setDate(monday.getDate()+i); const dIso=fmtDate(d); const list=state.data.days[dIso]||[]; wMin+=list.reduce((acc,x)=>acc+x.durationMin,0);} weekTotalEl.textContent=minutesToHHMM(wMin);}
+function selectDate(d){state.selectedDate=new Date(d); state.month=state.selectedDate.getMonth(); state.year=state.selectedDate.getFullYear(); renderCalendar(); renderDetails();}
+function openActivity(item){activityId.value=item?.id||''; activityTitle.value=item?.title||''; activityCategory.value=item?.category||'Generale'; activityTags.value=(item?.tags||[]).join(','); startTime.value=item?.start||''; endTime.value=item?.end||''; breakMinutes.value=item?.break||0; activityDialog.showModal();}
+function calculateDurationMin(start,end,brk){const[sh,sm]=start.split(':').map(Number); const[eh,em]=end.split(':').map(Number); let mins=(eh*60+em)-(sh*60+sm)-(Number(brk)||0); if(mins<0) mins=0; return mins;}
+activityForm.addEventListener('submit',(ev)=>{ev.preventDefault(); const title=activityTitle.value.trim(); const start=startTime.value; const end=endTime.value; if(!title||!start||!end){alert('Compila i campi obbligatori'); return;} const brk=Number(breakMinutes.value||0); const mins=calculateDurationMin(start,end,brk); const iso=fmtDate(state.selectedDate); const item={id:activityId.value||crypto.randomUUID(), title, category:activityCategory.value, tags:activityTags.value?activityTags.value.split(',').map(t=>t.trim()).filter(Boolean):[], start, end, break:brk, durationMin:mins, durationHHMM:minutesToHHMM(mins), notes:document.getElementById('activityNotes').value||''}; const list=state.data.days[iso]||[]; const idx=list.findIndex(x=>x.id===item.id); if(idx>=0){list[idx]=item}else{list.push(item)} state.data.days[iso]=list; save(); activityDialog.close(); renderDetails(); renderCalendar();});
+newActivityBtn.addEventListener('click',()=>openActivity());
+document.getElementById('prevMonth').addEventListener('click',()=>{const d=new Date(state.year,state.month-1,1); state.month=d.getMonth(); state.year=d.getFullYear(); selectDate(new Date(state.year,state.month,1)); monthSelect.value=state.month; yearSelect.value=state.year;});
+document.getElementById('nextMonth').addEventListener('click',()=>{const d=new Date(state.year,state.month+1,1); state.month=d.getMonth(); state.year=d.getFullYear(); selectDate(new Date(state.year,state.month,1)); monthSelect.value=state.month; yearSelect.value=state.year;});
+document.getElementById('todayBtn').addEventListener('click',()=>selectDate(new Date()));
+monthSelect.addEventListener('change',()=>{state.month=Number(monthSelect.value); selectDate(new Date(state.year,state.month,1));});
+yearSelect.addEventListener('change',()=>{state.year=Number(yearSelect.value); selectDate(new Date(state.year,state.month,1));});
+function build(){buildSelectors(); renderCalendar(); renderDetails();}
+function renderAll(){applyTheme(state.data.settings?.theme||'system'); build();}
+function applyTheme(mode){const root=document.documentElement; root.classList.remove('light'); if(mode==='light'){root.classList.add('light')} else if(mode==='system'){const prefersLight=window.matchMedia('(prefers-color-scheme: light)').matches; if(prefersLight) root.classList.add('light');}}
+// Export/Backup minimal
+function toCSV(rows){const header=['Data','Titolo','Categoria','Tag','Inizio','Fine','Pausa(min)','Durata(min)','Durata(hh:mm)','Note']; const lines=[header.join(';')].concat(rows.map(r=>[r.date,r.title,r.category,(r.tags||[]).join(','),r.start,r.end,r.break,r.durationMin,r.durationHHMM,(r.notes||'').replace(/\n/g,' ').replace(/;/g,',')].join(';'))); return lines.join('\n');}
+function download(filename,content,type){const blob=new Blob([content],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+document.getElementById('exportWeekBtn').addEventListener('click',()=>{const start=new Date(state.selectedDate); const dow=(start.getDay()+6)%7; start.setDate(start.getDate()-dow); const rows=[]; for(let i=0;i<7;i++){const d=new Date(start); d.setDate(start.getDate()+i); const iso=fmtDate(d); (state.data.days[iso]||[]).forEach(x=>rows.push({date:iso,...x}));} const csv=toCSV(rows); download(`settimana_${fmtDate(start)}.csv`,csv,'text/csv');});
+document.getElementById('exportMonthBtn').addEventListener('click',()=>{const rows=[]; const days=new Date(state.year,state.month+1,0).getDate(); for(let i=1;i<=days;i++){const d=new Date(state.year,state.month,i); const iso=fmtDate(d); (state.data.days[iso]||[]).forEach(x=>rows.push({date:iso,...x}));} const csv=toCSV(rows); const mLabel=new Intl.DateTimeFormat('it-IT',{month:'long',year:'numeric'}).format(new Date(state.year,state.month,1)).replace(' ','_'); download(`mese_${mLabel}.csv`,csv,'text/csv');});
+// Clear data
+document.getElementById('clearDataBtn').addEventListener('click',(e)=>{e.preventDefault(); if(confirm('Confermi la cancellazione di TUTTI i dati?')){ localStorage.removeItem(STORAGE_KEY); state.data={version:1,days:{},settings:{theme:'system'}}; renderAll(); }});
+// Settings
+document.getElementById('btnMenu').addEventListener('click',()=>document.getElementById('settingsDialog').showModal());
+document.getElementById('themeSelect').addEventListener('change',()=>{state.data.settings.theme=document.getElementById('themeSelect').value; save(); applyTheme(state.data.settings.theme);});
+// Init
+load();})();
+</script>
+</body>
+</html>
